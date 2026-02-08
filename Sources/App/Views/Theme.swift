@@ -629,6 +629,11 @@ extension AppTheme {
             return scheme == .dark
                 ? Color(red: 1.0, green: 0.60, blue: 0.20)
                 : Color(red: 0.92, green: 0.47, blue: 0.07)
+        case "kimi":
+            // Kimi Moonlight/Indigo color
+            return scheme == .dark
+                ? Color(red: 0.4, green: 0.4, blue: 0.9)
+                : Color(red: 0.3, green: 0.3, blue: 0.8)
         default:
             return purpleVibrant(for: scheme)
         }
@@ -667,6 +672,11 @@ extension AppTheme {
             secondaryColor = scheme == .dark
                 ? Color(red: 0.85, green: 0.40, blue: 0.15)
                 : Color(red: 0.75, green: 0.30, blue: 0.05)
+        case "kimi":
+            // Kimi Indigo gradient
+            secondaryColor = scheme == .dark
+                ? Color(red: 0.2, green: 0.2, blue: 0.6)
+                : Color(red: 0.5, green: 0.5, blue: 1.0)
         default:
             return accentGradient(for: scheme)
         }
@@ -688,6 +698,7 @@ extension AppTheme {
         case "antigravity": return "AntigravityIcon"
         case "zai": return "ZaiIcon"
         case "bedrock": return "BedrockIcon"
+        case "kimi": return "KimiIcon"
         default: return "QuestionIcon"
         }
     }
@@ -702,6 +713,7 @@ extension AppTheme {
         case "antigravity": return "Antigravity"
         case "zai": return "Z.ai"
         case "bedrock": return "AWS Bedrock"
+        case "kimi": return "Kimi"
         default: return providerId.capitalized
         }
     }
@@ -716,6 +728,7 @@ extension AppTheme {
         case "antigravity": return "wand.and.stars"
         case "zai": return "z.square.fill"
         case "bedrock": return "cloud.fill" // AWS cloud icon
+        case "kimi": return "moon.stars.fill" // Moon icon for Moonshot AI
         default: return "questionmark.circle.fill"
         }
     }
