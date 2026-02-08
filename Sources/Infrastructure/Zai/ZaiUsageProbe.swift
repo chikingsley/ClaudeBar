@@ -44,7 +44,15 @@ public struct ZaiUsageProbe: UsageProbe {
 
     /// Checks if Z.ai is available by looking for Claude CLI and z.ai configuration
     public func isAvailable() async -> Bool {
-        // Check if Claude CLI is installed
+        // Step 1: Check environment variable fallback first
+        let envVarName = settingsRepository.glmAuthEnvVar()
+        if !envVarName.isEmpty,
+           let envValue = ProcessInfo.processInfo.environment[envVarName],
+           !envValue.isEmpty {
+            return true
+        }
+
+        // Step 2: Check if Claude CLI is installed
         guard cliExecutor.locate("claude") != nil else {
             let env = ProcessInfo.processInfo.environment
             AppLog.probes.info("Zai: Claude CLI not found")
@@ -53,7 +61,7 @@ public struct ZaiUsageProbe: UsageProbe {
             return false
         }
 
-        // Check if z.ai is configured in Claude settings
+        // Step 3: Check if z.ai is configured in Claude settings
         do {
             let (config, _) = try await readClaudeConfig()
             return Self.hasZaiEndpoint(in: config)
@@ -65,28 +73,55 @@ public struct ZaiUsageProbe: UsageProbe {
 
     /// Fetches the current usage quota from Z.ai API
     public func probe() async throws -> UsageSnapshot {
-        guard cliExecutor.locate("claude") != nil else {
-            AppLog.probes.error("Zai probe failed: Claude CLI not found")
-            throw ProbeError.cliNotFound("Claude")
+        var platform: ZaiPlatform?
+        var apiKey: String?
+
+        // 1. Try Claude Config strategy if CLI is available
+        if cliExecutor.locate("claude") != nil {
+            do {
+                let (config, path) = try await readClaudeConfig()
+                if let detected = Self.detectPlatform(from: config) {
+                    platform = detected
+                    // Try to get API key (from config or env fallback using helper)
+                    apiKey = try extractAPIKeyWithFallback(from: config, configPath: path)
+                }
+            } catch {
+                AppLog.probes.debug("Zai: Claude config strategy failed: \(error.localizedDescription)")
+            }
         }
 
-        let (config, configPath): (String, String)
-        do {
-            (config, configPath) = try await readClaudeConfig()
-        } catch {
-            AppLog.probes.error("Zai probe failed: Could not read Claude config: \(error.localizedDescription)")
-            throw ProbeError.executionFailed("Could not read Claude config")
+        // 2. Fallback to direct Env Var strategy if needed
+        if apiKey == nil {
+            let envVarName = settingsRepository.glmAuthEnvVar()
+            if !envVarName.isEmpty,
+               let envValue = ProcessInfo.processInfo.environment[envVarName],
+               !envValue.isEmpty {
+                apiKey = envValue
+                if platform == nil {
+                    AppLog.probes.info("Zai: Defaulting to .zai platform with env var credentials")
+                    platform = .zai
+                }
+            }
         }
 
-        guard let platform = Self.detectPlatform(from: config) else {
-            AppLog.probes.error("Zai probe failed: No z.ai endpoint found in Claude config (path: \(configPath))")
+        // 3. Validation
+        guard let finalPlatform = platform else {
+            if cliExecutor.locate("claude") == nil {
+                AppLog.probes.error("Zai probe failed: Claude CLI not found and no API key env var set")
+                throw ProbeError.cliNotFound("Claude")
+            }
+            AppLog.probes.error("Zai probe failed: No z.ai endpoint in config and no env var set")
             throw ProbeError.authenticationRequired
         }
 
-        let apiKey = try extractAPIKeyWithFallback(from: config, configPath: configPath)
-        AppLog.probes.debug("Zai: Detected platform: \(platform.rawValue)")
+        guard let finalApiKey = apiKey else {
+            AppLog.probes.error("Zai probe failed: No API key found")
+            throw ProbeError.authenticationRequired
+        }
 
-        let baseURL = platform.rawValue
+        AppLog.probes.debug("Zai: Detected platform: \(finalPlatform.rawValue)")
+
+        let baseURL = finalPlatform.rawValue
         guard let url = URL(string: "\(baseURL)/api/monitor/usage/quota/limit") else {
             AppLog.probes.error("Zai probe failed: Invalid API URL")
             throw ProbeError.executionFailed("Invalid API URL")
