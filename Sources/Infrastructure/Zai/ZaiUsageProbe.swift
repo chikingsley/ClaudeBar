@@ -45,10 +45,7 @@ public struct ZaiUsageProbe: UsageProbe {
     /// Checks if Z.ai is available by looking for Claude CLI and z.ai configuration
     public func isAvailable() async -> Bool {
         // Step 1: Check environment variable fallback first
-        let envVarName = settingsRepository.glmAuthEnvVar()
-        if !envVarName.isEmpty,
-           let envValue = ProcessInfo.processInfo.environment[envVarName],
-           !envValue.isEmpty {
+        if getEnvVarApiKey() != nil {
             return true
         }
 
@@ -92,11 +89,8 @@ public struct ZaiUsageProbe: UsageProbe {
 
         // 2. Fallback to direct Env Var strategy if needed
         if apiKey == nil {
-            let envVarName = settingsRepository.glmAuthEnvVar()
-            if !envVarName.isEmpty,
-               let envValue = ProcessInfo.processInfo.environment[envVarName],
-               !envValue.isEmpty {
-                apiKey = envValue
+            if let envKey = getEnvVarApiKey() {
+                apiKey = envKey
                 if platform == nil {
                     AppLog.probes.info("Zai: Defaulting to .zai platform with env var credentials")
                     platform = .zai
@@ -198,18 +192,24 @@ public struct ZaiUsageProbe: UsageProbe {
             return configApiKey
         }
 
+        if let envKey = getEnvVarApiKey() {
+            AppLog.probes.debug("Zai: API key not in config, using env var '\(settingsRepository.glmAuthEnvVar())'")
+            return envKey
+        }
+
         let envVarName = settingsRepository.glmAuthEnvVar()
-        guard !envVarName.isEmpty else {
+        if envVarName.isEmpty {
             AppLog.probes.error("Zai probe failed: No API key found (config file: \(configPath), env var: not set)")
-            throw ProbeError.authenticationRequired
-        }
-
-        guard let envValue = ProcessInfo.processInfo.environment[envVarName], !envValue.isEmpty else {
+        } else {
             AppLog.probes.error("Zai probe failed: No API key found (config file: \(configPath), env var: \(envVarName) not set)")
-            throw ProbeError.authenticationRequired
         }
+        throw ProbeError.authenticationRequired
+    }
 
-        AppLog.probes.debug("Zai: API key not in config, using env var '\(envVarName)'")
+    private func getEnvVarApiKey() -> String? {
+        let envVarName = settingsRepository.glmAuthEnvVar()
+        guard !envVarName.isEmpty else { return nil }
+        guard let envValue = ProcessInfo.processInfo.environment[envVarName], !envValue.isEmpty else { return nil }
         return envValue
     }
 
