@@ -61,6 +61,10 @@ struct ClaudeBarApp: App {
                 probe: BedrockUsageProbe(settingsRepository: settingsRepository),
                 settingsRepository: settingsRepository
             ),
+            KimiProvider(
+                probe: KimiUsageProbe(),
+                settingsRepository: settingsRepository
+            ),
         ])
         AppLog.providers.info("Created \(repository.all.count) providers")
 
