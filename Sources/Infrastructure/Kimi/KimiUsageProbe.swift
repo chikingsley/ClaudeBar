@@ -27,17 +27,21 @@ public struct KimiUsageProbe: UsageProbe {
     }
 
     public func probe() async throws -> UsageSnapshot {
-        // TODO: Implement actual data fetching logic here.
-        // Currently returning a hardcoded snapshot for demonstration purposes.
-        // You would typically:
-        // 1. Fetch data from a local API (like Antigravity) or remote API (like Gemini).
-        // 2. Parse the response using parseResponse.
+        // Try reading from local file first (for manual testing/integration)
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let statusFile = homeDir.appendingPathComponent(".kimi/status.json")
 
-        // Example:
-        // let data = try await fetchData()
-        // return try Self.parseResponse(data, providerId: "kimi")
+        if FileManager.default.fileExists(atPath: statusFile.path) {
+            do {
+                let data = try Data(contentsOf: statusFile)
+                return try Self.parseResponse(data, providerId: "kimi")
+            } catch {
+                // Log error but fall through to hardcoded fallback
+                print("Failed to read .kimi/status.json: \(error)")
+            }
+        }
 
-        // For now, return a hardcoded snapshot as we don't have the API
+        // Fallback: Return a hardcoded snapshot for demonstration
         let quota = UsageQuota(
             percentRemaining: 100.0,
             quotaType: .modelSpecific("moonshot-v1-8k"),
